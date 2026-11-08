@@ -1,23 +1,29 @@
-import { useEffect, useState } from "react";
+import Link from "next/link";
 
 type Course = {
   id: number;
   title: string;
   price: number;
 };
-export default function Courses() {
-  const [courses, setCourses] = useState<Course[]>([]);
-  useEffect(() => {
-    fetch("http://localhost:8000/courses")
-      .then((res) => res.json())
-      .then((data) => setCourses(data));
-  }, []);
+
+export async function getServerSideProps() {
+  const res = await fetch("http://localhost:8000/orm/courses");
+  if (!res.ok) {
+    throw new Error(`강의 목록 실패: ${res.status}`);
+  }
+  const courses: Course[] = await res.json();
+  return { props: { courses } };
+}
+
+export default function Courses({ courses }: { courses: Course[] }) {
   return (
     <>
       <h1>강의 목록</h1>
       <ol>
         {courses.map((course) => (
-          <li key={course.id}>{course.title}</li>
+          <li key={course.id}>
+            <Link href={`/courses/${course.id}`}>{course.title}</Link>
+          </li>
         ))}
       </ol>
     </>
