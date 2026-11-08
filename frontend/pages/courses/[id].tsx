@@ -1,4 +1,5 @@
 import type { GetServerSidePropsContext } from "next";
+import { API_BASE_URL } from "../../lib/api";
 
 type Course = {
   id: number;
@@ -9,7 +10,7 @@ type Course = {
 
 export async function getServerSideProps(context: GetServerSidePropsContext) {
   const id = context.params?.id;
-  const res = await fetch(`http://localhost:8000/orm/courses/${id}`);
+  const res = await fetch(`${API_BASE_URL}/orm/courses/${id}`);
   if (res.status >= 400 && res.status < 500) {
     return { notFound: true };
   }

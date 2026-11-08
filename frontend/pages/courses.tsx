@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { API_BASE_URL } from "../lib/api";
 
 type Course = {
   id: number;
@@ -7,7 +8,7 @@ type Course = {
 };
 
 export async function getServerSideProps() {
-  const res = await fetch("http://localhost:8000/orm/courses");
+  const res = await fetch(`${API_BASE_URL}/orm/courses`);
   if (!res.ok) {
     throw new Error(`강의 목록 실패: ${res.status}`);
   }
