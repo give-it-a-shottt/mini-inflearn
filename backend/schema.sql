@@ -8,13 +8,27 @@ CREATE TABLE IF NOT EXISTS courses (
     price      INTEGER     NOT NULL
 );
 
-INSERT INTO courses (title, instructor, price)
-SELECT * FROM (VALUES
-    ('파이썬',      '클로드',  33000),
-    ('파이썬입문',  '클로드',   3000),
-    ('파이썬입문2', '클로드2', 313000)
-) AS seed(title, instructor, price)
-WHERE NOT EXISTS (SELECT 1 FROM courses);
+-- 분야: 강의 목록의 탭(프론트엔드 · 백엔드 · 데이터베이스) 필터에 쓴다.
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS area VARCHAR(20) NOT NULL DEFAULT 'etc';
+
+-- 강의 8개 (디자인 · 네이비 시안). 이미 있는 id는 내용을 덮어쓰고, 없으면 새로 넣는다.
+-- 썸네일 · 커리큘럼 · 평점처럼 보여 주기만 하는 정보는 프론트(frontend/lib/courseMeta.ts)에 id로 짝지어 둔다.
+INSERT INTO courses (id, title, instructor, price, area) OVERRIDING SYSTEM VALUE
+VALUES
+    (1, 'Next.js 페이지 라우터로 만드는 풀스택 웹 서비스', '김태현', 30000, 'frontend'),
+    (2, 'FastAPI로 시작하는 백엔드 API 설계 입문',        '이서준',     0, 'backend'),
+    (3, 'PostgreSQL 트랜잭션과 동시성 제대로 이해하기',    '박지민', 45000, 'database'),
+    (4, 'Docker와 GitHub Actions로 끝내는 배포 자동화',   '정하늘', 25000, 'backend'),
+    (5, 'TanStack Query로 서버 상태 깔끔하게 관리하기',    '최유진', 35000, 'frontend'),
+    (6, '처음 배우는 TypeScript 핵심 문법 한 번에 끝내기', '한도윤',     0, 'frontend'),
+    (7, 'HTTP 요청과 응답, 상태 코드 완전 정복',          '오민재', 20000, 'backend'),
+    (8, '협업을 위한 Git 브랜치 전략과 PR 리뷰',          '윤서아', 15000, 'etc')
+ON CONFLICT (id) DO UPDATE
+SET title = EXCLUDED.title, instructor = EXCLUDED.instructor,
+    price = EXCLUDED.price, area = EXCLUDED.area;
+
+-- id를 직접 넣었으니, 다음 자동 번호가 9부터 이어지게 맞춘다.
+SELECT setval(pg_get_serial_sequence('courses', 'id'), (SELECT MAX(id) FROM courses));
 
 -- ── Phase 2: 수강신청 ─────────────────────────────────────────────
 -- 유저: 로그인 대신 고정 테스트 유저 1명. 포인트는 0 미만이 될 수 없다(CHECK).

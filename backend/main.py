@@ -45,6 +45,7 @@ class Course(Base):
     title: Mapped[str]
     instructor: Mapped[str]
     price: Mapped[int]
+    area: Mapped[str]  # frontend / backend / database / etc — 강의 목록 탭 필터에 쓴다
 
 
 class User(Base):
@@ -70,6 +71,12 @@ class CourseOut(BaseModel):
     title: str
     instructor: str
     price: int
+    area: str
+
+
+class MyEnrollmentOut(BaseModel):
+    course_id: int
+    enrolled_at: datetime
 
 
 class MeOut(BaseModel):
@@ -77,6 +84,7 @@ class MeOut(BaseModel):
     name: str
     points: int
     enrolled_course_ids: list[int]
+    enrollments: list[MyEnrollmentOut]  # 신청일까지 필요한 화면(강의 상세의 '신청일')용
 
 
 class EnrollIn(BaseModel):
@@ -213,11 +221,15 @@ def get_me(user_id: CurrentUserId):
         user = session.get(User, user_id)
         if user is None:  # 토큰은 진짜인데 그 사이 유저가 지워진 경우
             raise HTTPException(status_code=401, detail="존재하지 않는 사용자입니다")
-        course_ids = session.scalars(
-            select(Enrollment.course_id).where(Enrollment.user_id == user_id)
+        rows = session.execute(
+            select(Enrollment.course_id, Enrollment.created_at)
+            .where(Enrollment.user_id == user_id)
+            .order_by(Enrollment.created_at)
         ).all()
         return MeOut(id=user.id, name=user.name, points=user.points,
-                     enrolled_course_ids=list(course_ids))
+                     enrolled_course_ids=[r.course_id for r in rows],
+                     enrollments=[MyEnrollmentOut(course_id=r.course_id, enrolled_at=r.created_at)
+                                  for r in rows])
 
 
 @app.post("/enrollments", response_model=EnrollOut, status_code=201)

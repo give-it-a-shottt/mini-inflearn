@@ -1,52 +1,59 @@
-import { useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
-import { useRouter } from "next/router";
 import { useState } from "react";
-import { clearToken, login } from "../lib/api";
+import {
+  AuthCard,
+  Field,
+  FormError,
+  PasswordField,
+  SubmitButton,
+  SwitchLink,
+  TEST_ACCOUNT,
+  TestAccountBanner,
+  useAuthSubmit,
+  useNextPath,
+} from "../components/tl/AuthCard";
+import { login } from "../lib/api";
 
-// 로그인 화면: 성공하면 JWT가 localStorage에 저장되고, 이후 요청에 자동으로 붙는다.
-// 테스트 계정: test@example.com / test1234
+// 06 로그인 — 성공하면 JWT가 localStorage에 저장되고, 이후 요청에 자동으로 붙는다.
+// ?next=/courses/3 처럼 오면 로그인 뒤 그 강의로 돌아간다.
 export default function Login() {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const [email, setEmail] = useState("test@example.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    try {
-      await login(email, password);
-      // 사람이 바뀌었으니 이전 사람의 "me" 캐시는 버린다.
-      queryClient.removeQueries({ queryKey: ["me"] });
-      router.push("/courses");
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  }
-
-  function handleLogout() {
-    clearToken();
-    queryClient.removeQueries({ queryKey: ["me"] });
-    setError("로그아웃했어요");
-  }
+  const { submit, error, pending } = useAuthSubmit(() => login(email, password));
+  const next = useNextPath();
 
   return (
-    <>
-      <p><Link href="/courses">← 강의 목록</Link></p>
-      <h1>로그인</h1>
-      <form onSubmit={handleSubmit}>
-        <p>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="이메일" />
-        </p>
-        <p>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="비밀번호" />
-        </p>
-        <button type="submit">로그인</button>{" "}
-        <button type="button" onClick={handleLogout}>로그아웃</button>
+    <AuthCard
+      pageTitle="로그인"
+      title="성장을 돕는 TechLearn에 오신 것을 환영합니다"
+      description="로그인하고 내 포인트와 수강 중인 강의를 바로 확인하세요."
+      footer={
+        <>
+          <p className="text-tl-sub">아직 TechLearn 회원이 아니신가요?</p>
+          <SwitchLink href={`/signup?next=${encodeURIComponent(next)}`}>30초 만에 간편 회원가입하기</SwitchLink>
+        </>
+      }
+    >
+      <TestAccountBanner
+        onUse={() => {
+          setEmail(TEST_ACCOUNT.email);
+          setPassword(TEST_ACCOUNT.password);
+        }}
+      />
+      <form onSubmit={submit} className="flex flex-col gap-4">
+        <Field
+          id="tl-email"
+          label="이메일"
+          type="email"
+          icon={{ src: "/tl/icon-mail.svg", width: 16.67, height: 13.33 }}
+          value={email}
+          onChange={setEmail}
+          placeholder="example@techlearn.io"
+          autoComplete="email"
+        />
+        <PasswordField value={password} onChange={setPassword} autoComplete="current-password" />
+        <FormError message={error} />
+        <SubmitButton pending={pending}>로그인</SubmitButton>
       </form>
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
-    </>
+    </AuthCard>
   );
 }

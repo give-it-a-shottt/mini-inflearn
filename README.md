@@ -3,7 +3,7 @@
 강의 목록·상세를 보고, 포인트로 수강신청을 하는 작은 온라인 강의 서비스.
 Next.js · FastAPI · PostgreSQL을 처음부터 직접 만들며 "요청이 화면에서 DB까지 어떻게 흘러가는지"를 익히기 위한 학습 프로젝트다.
 
-- 서비스: https://mini-inflearn.vercel.app/courses
+- 서비스: https://mini-inflearn.vercel.app (체험용 계정 `test@example.com` / `test1234`)
 - API: https://mini-inflearn-api.onrender.com/orm/courses
   (Render 무료 플랜이라 15분 동안 요청이 없으면 잠든다. 첫 요청은 30~50초 걸릴 수 있다.)
 
@@ -24,15 +24,19 @@ Next.js · FastAPI · PostgreSQL을 처음부터 직접 만들며 "요청이 화
 
 ## 기능
 
+화면은 피그마 「TechLearn · 디자인 네이비」 시안을 옮겼다(PC · 모바일 반응형). 시안 중 실제로 동작하는 기능의 화면만 옮기고, 장바구니 · 결제 · 소셜 로그인처럼 백엔드가 없는 화면은 넣지 않았다.
+
 | 화면 / API | 내용 |
 |---|---|
-| `/courses` | 강의 목록. `getServerSideProps`로 서버에서 그려서 보낸다(SSR). |
-| `/courses/[id]` | 강의 상세(SSR) + 내 포인트 + 수강신청 버튼. 없는 강의는 404 페이지. |
-| `/login` | 로그인·로그아웃. 받은 JWT를 localStorage에 저장한다. |
+| `/` | 메인 홈. 홍보용 정적 화면(`lib/homeData.ts`). 검색하면 강의 목록으로 간다. |
+| `/courses` | 강의 목록. `getServerSideProps`로 서버에서 그려서 보낸다(SSR). 분야 탭(`?tab=`)과 검색(`?q=`), 로그인했으면 '수강 중' 배지(CSR). |
+| `/courses/[id]` | 강의 상세(SSR) + 내 포인트 + 수강신청 버튼 상태(로그인 전 · 신청 가능 · 신청 중 · 수강 중 · 포인트 부족) → 확인 모달 → 응답 토스트. |
+| `/login`, `/signup` | 로그인 · 회원가입. 받은 JWT를 localStorage에 저장한다. `?next=`로 원래 보던 강의로 돌아간다. |
+| `/404`, `/500` | 없는 강의 · 서버 오류 안내 |
 | `GET /orm/courses`, `GET /orm/courses/{id}` | 강의 목록·상세. 응답 모델(`CourseOut`)로 내보낼 칸만 거른다. |
 | `POST /signup` | 가입(50,000P 지급) + JWT 발급. 201 / 409(이미 가입한 이메일) |
 | `POST /login` | 이메일·비밀번호 확인 후 JWT 발급. 200 / 401 |
-| `GET /me` | 로그인한 유저의 포인트와 신청한 강의 id 목록. 토큰 필요 |
+| `GET /me` | 로그인한 유저의 포인트와 신청한 강의(신청일 포함). 토큰 필요 |
 | `POST /enrollments` | 수강신청. 201 / 400(포인트 부족) / 401(토큰 없음·위조·만료) / 404(없는 강의) / 409(이미 신청) |
 
 테스트 계정: `test@example.com` / `test1234` (기존 테스트유저 id 1, 50,000P)
@@ -129,8 +133,12 @@ mini-inflearn/
 │   └── .env.example
 └── frontend/
     ├── lib/api.ts           API 주소와 호출 함수
+    ├── lib/hooks.ts         useMe(로그인한 나), useEnroll(수강신청 흐름)
+    ├── lib/courseMeta.ts    강의 썸네일 · 커리큘럼 등 보여 주기용 정보 (DB id로 짝짓기)
+    ├── components/tl/       헤더 · 푸터 · 수강신청 모달 · 로그인 카드
+    ├── public/tl/           시안 이미지 · 아이콘
     ├── pages/_app.tsx       QueryClientProvider
-    └── pages/courses.tsx, pages/courses/[id].tsx, pages/login.tsx
+    └── pages/               index, courses, courses/[id], login, signup, 404, 500
 ```
 
 ## 다음에 할 것

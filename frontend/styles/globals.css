@@ -1,26 +1,114 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * TechLearn 디자인 토큰 — 피그마 「디자인 · 네이비」 시안.
+ * 포인트 색은 네이비(tl) 하나, 할인·오류만 빨강(tl-sale). 바탕은 옅은 파랑(tl-bg) 위에 흰 카드.
+ */
+@theme {
+  --font-sans:
+    "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    system-ui, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+
+  /* 글자 크기 — 32px 이상 행간 130% / 16~28px 140% / 15px 이하 145%, 자간 -2.5% */
+  --text-11: 11px;
+  --text-11--line-height: 1.45;
+  --text-11--letter-spacing: -0.025em;
+  --text-12: 12px;
+  --text-12--line-height: 1.45;
+  --text-12--letter-spacing: -0.025em;
+  --text-13: 13px;
+  --text-13--line-height: 1.45;
+  --text-13--letter-spacing: -0.025em;
+  --text-14: 14px;
+  --text-14--line-height: 1.45;
+  --text-14--letter-spacing: -0.025em;
+  --text-15: 15px;
+  --text-15--line-height: 1.45;
+  --text-15--letter-spacing: -0.025em;
+  --text-16: 16px;
+  --text-16--line-height: 1.4;
+  --text-16--letter-spacing: -0.025em;
+  --text-18: 18px;
+  --text-18--line-height: 1.4;
+  --text-18--letter-spacing: -0.025em;
+  --text-20: 20px;
+  --text-20--line-height: 1.4;
+  --text-20--letter-spacing: -0.025em;
+  --text-22: 22px;
+  --text-22--line-height: 1.4;
+  --text-22--letter-spacing: -0.025em;
+  --text-24: 24px;
+  --text-24--line-height: 1.4;
+  --text-24--letter-spacing: -0.025em;
+  --text-28: 28px;
+  --text-28--line-height: 1.4;
+  --text-28--letter-spacing: -0.025em;
+  --text-32: 32px;
+  --text-32--line-height: 1.3;
+  --text-32--letter-spacing: -0.025em;
+  --text-40: 40px;
+  --text-40--line-height: 1.3;
+  --text-40--letter-spacing: -0.025em;
+
+  /* 모서리 — xs 4 · sm 8 · md 12 · lg 16, 태그 2 · 칩 6 */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-tl-tag: 2px;
+  --radius-tl-chip: 6px;
+
+  --color-tl: #1e3a8a;
+  --color-tl-ink: #171c21;
+  --color-tl-sub: #3b404b;
+  --color-tl-body: #434a57;
+  --color-tl-muted: #6b7385;
+  --color-tl-weak: #6b707c;
+  --color-tl-bg: #eff4fb;
+  --color-tl-bg-alt: #f6f9ff;
+  --color-tl-chip: #eaeef5;
+  --color-tl-line: #e4e8ef;
+  --color-tl-dark: #2c3136;
+  --color-tl-on-dark: #e3e2e3;
+  --color-tl-sale: #ba1a1a;
+  --color-tl-hot: #93000a;
+  --color-tl-hot-soft: #ffdad6;
+  --color-tl-lavender: #a5b4fc;
+  --color-tl-indigo-soft: #c7d2fe;
+  --color-tl-indigo-ink: #0b1330;
+  --color-tl-step: #4f6bd8;
+  --color-status-error-soft: #fff0f0;
+  --text-color-disabled: #999999;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  &::-webkit-scrollbar {
+    display: none;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    background: var(--color-tl-bg-alt);
+    color: var(--color-tl-ink);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  :is(a, button, summary):focus-visible {
+    outline: 2px solid var(--color-tl);
+    outline-offset: 2px;
+  }
 }
