@@ -15,3 +15,26 @@ SELECT * FROM (VALUES
     ('파이썬입문2', '클로드2', 313000)
 ) AS seed(title, instructor, price)
 WHERE NOT EXISTS (SELECT 1 FROM courses);
+
+-- ── Phase 2: 수강신청 ─────────────────────────────────────────────
+-- 유저: 로그인 대신 고정 테스트 유저 1명. 포인트는 0 미만이 될 수 없다(CHECK).
+CREATE TABLE IF NOT EXISTS users (
+    id     INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name   VARCHAR(20) NOT NULL,
+    points INTEGER     NOT NULL DEFAULT 0 CHECK (points >= 0)
+);
+
+-- 수강신청: 누가(user_id) 어떤 강의(course_id)를 신청했나.
+-- UNIQUE (user_id, course_id) → 같은 유저가 같은 강의를 두 번 신청하면 DB가 거부한다.
+CREATE TABLE IF NOT EXISTS enrollments (
+    id         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id    INTEGER     NOT NULL REFERENCES users(id),
+    course_id  INTEGER     NOT NULL REFERENCES courses(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (user_id, course_id)
+);
+
+-- 테스트 유저: 50,000P → 33,000 + 3,000 강의는 살 수 있고 313,000 강의는 포인트 부족
+INSERT INTO users (name, points)
+SELECT '테스트유저', 50000
+WHERE NOT EXISTS (SELECT 1 FROM users);
