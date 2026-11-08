@@ -10,6 +10,7 @@ psycopg==3.3.6
 psycopg-binary==3.3.6 ; implementation_name != 'pypy'
 pydantic==2.14.1
 pydantic-core==2.50.1
+pyjwt==2.15.1
 python-dotenv==1.2.4
 sqlalchemy==2.1.6
 starlette==1.8.0

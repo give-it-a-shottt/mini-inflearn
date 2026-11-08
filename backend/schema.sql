@@ -38,3 +38,15 @@ CREATE TABLE IF NOT EXISTS enrollments (
 INSERT INTO users (name, points)
 SELECT '테스트유저', 50000
 WHERE NOT EXISTS (SELECT 1 FROM users);
+
+-- ── 로그인(JWT) ───────────────────────────────────────────────────
+-- 기존 users 테이블에 로그인용 칸을 추가한다. 비밀번호는 원문 대신 해시만 저장한다.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email         VARCHAR(100) UNIQUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(200);
+
+-- 기존 테스트유저(1번)에게 로그인 정보를 준다: test@example.com / test1234
+-- (아래 해시는 main.py의 hash_password("test1234")로 만든 값)
+UPDATE users
+SET email = 'test@example.com',
+    password_hash = 'pbkdf2_sha256$600000$5b86a6a546b63593fb46eb2712f9ce9f$0ac8bd28e3893d83611058ed35ffc8fe661070c2e571308aa20126a3556a8243'
+WHERE id = 1 AND email IS NULL;

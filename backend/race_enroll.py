@@ -9,12 +9,15 @@ import urllib.error
 import urllib.request
 
 API = "http://localhost:8000"
+TOKEN = None  # 아래에서 테스트 계정으로 로그인해 채운다
 
 
 def call(method, path, body=None):
     data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(API + path, data=data, method=method,
-                                 headers={"Content-Type": "application/json"})
+    headers = {"Content-Type": "application/json"}
+    if TOKEN:
+        headers["Authorization"] = f"Bearer {TOKEN}"
+    req = urllib.request.Request(API + path, data=data, method=method, headers=headers)
     try:
         with urllib.request.urlopen(req) as res:
             return res.status, json.loads(res.read())
@@ -28,6 +31,7 @@ def enroll(course_id):
 
 
 course_ids = [int(x) for x in sys.argv[1:]] or [1, 2]
+TOKEN = call("POST", "/login", {"email": "test@example.com", "password": "test1234"})[1]["access_token"]
 print("시작 전:", call("GET", "/me")[1])
 threads = [threading.Thread(target=enroll, args=(c,)) for c in course_ids]
 [t.start() for t in threads]

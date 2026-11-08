@@ -28,11 +28,36 @@ Next.js · FastAPI · PostgreSQL을 처음부터 직접 만들며 "요청이 화
 |---|---|
 | `/courses` | 강의 목록. `getServerSideProps`로 서버에서 그려서 보낸다(SSR). |
 | `/courses/[id]` | 강의 상세(SSR) + 내 포인트 + 수강신청 버튼. 없는 강의는 404 페이지. |
+| `/login` | 로그인·로그아웃. 받은 JWT를 localStorage에 저장한다. |
 | `GET /orm/courses`, `GET /orm/courses/{id}` | 강의 목록·상세. 응답 모델(`CourseOut`)로 내보낼 칸만 거른다. |
-| `GET /me` | 테스트 유저의 포인트와 신청한 강의 id 목록 |
-| `POST /enrollments` | 수강신청. 201 / 400(포인트 부족) / 404(없는 강의) / 409(이미 신청) |
+| `POST /signup` | 가입(50,000P 지급) + JWT 발급. 201 / 409(이미 가입한 이메일) |
+| `POST /login` | 이메일·비밀번호 확인 후 JWT 발급. 200 / 401 |
+| `GET /me` | 로그인한 유저의 포인트와 신청한 강의 id 목록. 토큰 필요 |
+| `POST /enrollments` | 수강신청. 201 / 400(포인트 부족) / 401(토큰 없음·위조·만료) / 404(없는 강의) / 409(이미 신청) |
 
-로그인(JWT)은 범위 밖이라 고정 테스트 유저 1명(id 1, 50,000P)으로 대신한다.
+테스트 계정: `test@example.com` / `test1234` (기존 테스트유저 id 1, 50,000P)
+
+## 로그인(JWT)에서 지킨 것
+
+HTTP 요청에는 원래 "누가 보냈는지"가 없다. 로그인할 때 서버가 "너는 N번 유저"라고 적고 **서명한** 표(JWT)를 주고, 브라우저는 이후 요청마다 `Authorization: Bearer <토큰>` 헤더로 그 표를 보여 준다.
+
+```
+로그인    브라우저 ── POST /login {email, password} ──▶ 서버: DB의 비밀번호 해시와 대조
+          브라우저 ◀── JWT { sub: "1", exp } + 서명 ── 서버: 비밀키로 서명
+신청      브라우저 ── POST /enrollments + Authorization: Bearer <JWT> ──▶ 서버: 서명·만료 검증 → sub로 유저 결정
+```
+
+| 막는 것 | 방법 | 위치 |
+|---|---|---|
+| 남의 `user_id`로 바꿔치기한 토큰 | 서명 검증. 내용을 고치면 서버가 비밀키로 다시 계산한 서명과 달라져 401 | `get_current_user_id` |
+| 요청 body에 `user_id`를 넣어 남의 포인트로 신청 | `user_id`는 body가 아니라 검증된 토큰에서만 꺼낸다 | `enroll(body, user_id: CurrentUserId)` |
+| 토큰이 새면 영원히 쓰이는 문제 | `exp`로 유효기간 1시간 | `create_access_token` |
+| DB가 털리면 비밀번호도 털리는 문제 | 원문 대신 PBKDF2(소금 + 60만 번) 해시만 저장 | `hash_password` |
+| 가입 여부가 로그인 에러로 새는 문제 | 이메일 없음·비밀번호 틀림을 같은 401 문구로 응답 | `login` |
+
+- JWT는 **암호화가 아니라 서명**이다. 내용은 누구나 base64로 풀어 읽을 수 있으므로 비밀번호·개인정보는 넣지 않는다.
+- 비밀키(`JWT_SECRET`)는 서버 환경변수에만 있다. 이 값이 새면 누구나 아무 유저의 진짜 토큰을 만들 수 있다.
+- 토큰을 localStorage에 두면 구현이 단순한 대신, 페이지에 악성 스크립트가 들어오면(XSS) 토큰을 읽어 갈 수 있다. 실서비스에서는 `HttpOnly` 쿠키 + 짧은 access token + refresh token 조합을 검토한다.
 
 ## 수강신청에서 지킨 것
 
@@ -65,7 +90,7 @@ docker compose exec -T db psql -U postgres < backend/schema.sql   # 테이블 + 
 
 # 2. 백엔드 (http://localhost:8000, 문서: /docs)
 cd backend
-cp .env.example .env          # DATABASE_URL을 로컬 DB 주소로 채운다
+cp .env.example .env          # DATABASE_URL을 로컬 DB 주소로, JWT_SECRET을 무작위 값으로 채운다
 uv sync
 uv run uvicorn main:app --port 8000
 
@@ -84,6 +109,7 @@ npm run dev
 |---|---|---|---|
 | 백엔드 (Render) | `DATABASE_URL` | `postgresql+psycopg://postgres:...@localhost:5433/postgres` | Neon 주소 |
 | 백엔드 (Render) | `FRONTEND_ORIGINS` | `http://localhost:3000` | `http://localhost:3000,https://mini-inflearn.vercel.app` |
+| 백엔드 (Render) | `JWT_SECRET` | 무작위 긴 문자열 | 로컬과 **다른** 무작위 긴 문자열 |
 | 프론트 (Vercel) | `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:8000` | `https://mini-inflearn-api.onrender.com` |
 
 - `NEXT_PUBLIC_`로 시작하는 값은 빌드할 때 브라우저 JS에 박혀 누구나 볼 수 있다. 비밀값은 넣지 않는다.
@@ -96,7 +122,7 @@ mini-inflearn/
 ├── docker-compose.yml       로컬 PostgreSQL
 ├── troubleshooting.md       에러 기록 (TS-001 ~ )
 ├── backend/
-│   ├── main.py              FastAPI 앱 (모델, API, 수강신청 트랜잭션)
+│   ├── main.py              FastAPI 앱 (모델, API, 수강신청 트랜잭션, JWT 로그인)
 │   ├── schema.sql           테이블 + 기본 데이터 (로컬·Neon 공용)
 │   ├── race_enroll.py       동시 신청 실험
 │   ├── requirements.txt     Render 설치 목록
@@ -104,11 +130,12 @@ mini-inflearn/
 └── frontend/
     ├── lib/api.ts           API 주소와 호출 함수
     ├── pages/_app.tsx       QueryClientProvider
-    └── pages/courses.tsx, pages/courses/[id].tsx
+    └── pages/courses.tsx, pages/courses/[id].tsx, pages/login.tsx
 ```
 
 ## 다음에 할 것
 
-- 로그인(JWT): 고정 테스트 유저를 실제 유저로 바꾸기
+- 토큰 보관을 localStorage에서 HttpOnly 쿠키로 옮기고 refresh token 추가
+- 프론트 회원가입 화면 (지금은 `/docs`에서 `POST /signup`으로 가입)
 - 스키마 변경 관리(Alembic 마이그레이션). 지금은 `schema.sql`을 직접 실행한다.
 - 범위 밖으로 둔 것: 동영상 업로드, 실제 결제, 리뷰·Q&A, 진도율

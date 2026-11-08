@@ -28,7 +28,8 @@ export default function CourseDetail({ course }: { course: Course }) {
   const queryClient = useQueryClient();
 
   // 읽기(useQuery): "me"라는 이름표로 내 정보를 캐시에 담아 둔다. 브라우저에서 호출한다.
-  const me = useQuery({ queryKey: ["me"], queryFn: fetchMe });
+  // retry: false → 로그인 안 했을 때(401) 같은 실패를 3번 다시 시도하지 않는다.
+  const me = useQuery({ queryKey: ["me"], queryFn: fetchMe, retry: false });
 
   // 쓰기(useMutation): 버튼을 누를 때만 실행된다.
   const mutation = useMutation({
@@ -48,7 +49,11 @@ export default function CourseDetail({ course }: { course: Course }) {
 
       <hr />
       {me.isPending && <p>내 정보 불러오는 중...</p>}
-      {me.isError && <p>내 정보를 불러오지 못했어요: {me.error.message}</p>}
+      {me.isError && (
+        <p>
+          내 정보를 불러오지 못했어요: {me.error.message} · <Link href="/login">로그인하기</Link>
+        </p>
+      )}
       {me.data && (
         <p>
           {me.data.name}님의 포인트: <b>{me.data.points.toLocaleString()}P</b>

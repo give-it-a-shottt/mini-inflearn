@@ -19,6 +19,7 @@ export async function getServerSideProps() {
 export default function Courses({ courses }: { courses: Course[] }) {
   return (
     <>
+      <p><Link href="/login">로그인 / 로그아웃</Link></p>
       <h1>강의 목록</h1>
       <ol>
         {courses.map((course) => (
