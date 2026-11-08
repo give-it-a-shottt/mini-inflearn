@@ -38,6 +38,9 @@
 
 | 번호 | 제목 | 단계 | 원인 영역 |
 |---|---|---|---|
+| TS-013 | Vercel 배포 후 SSR은 되는데 수강신청 버튼만 CORS preflight 400으로 막힘 | Phase 3 · 배포(Vercel+Render) | 네트워크 |
+| TS-012 | Windows에서 uvicorn --reload가 재시작 도중 멈춰, 고친 코드 대신 옛 코드가 계속 응답 | Phase 2 · 수강신청 동시성 실험 | 환경 |
+| TS-011 (사례 후보) | 서로 다른 강의를 동시에 신청하면 포인트가 한 번만 빠지는 갱신 손실(lost update) | Phase 2 · 수강신청 트랜잭션 | 백엔드 |
 | TS-010 | 목록의 Link href에 백틱과 `${}`를 빼서 주소가 /courses/%7Bcourse.id%7D가 되고 FastAPI 422 → 404 페이지 | Phase 1 · 목록→상세 이동(Link) | 프론트 |
 | TS-009 | 없는 강의(/courses/999)를 열었는데 getServerSideProps가 FastAPI의 404를 확인하지 않아 빈 상세 페이지가 200으로 뜸 | Phase 1 · 강의 상세 SSR(동적 라우트 [id]) | 프론트 |
 | TS-008 | SSR 페이지에서 FastAPI가 꺼져 있어 getServerSideProps의 fetch가 ECONNREFUSED로 실패해 Next.js가 500 반환 | Phase 1 · 강의 목록 SSR(getServerSideProps) | 환경 |
@@ -52,6 +55,126 @@
 ---
 
 ## 기록
+
+### TS-013. Vercel 배포 후 SSR은 되는데 수강신청 버튼만 CORS preflight 400으로 막힘
+- 날짜: 2026-11-08
+- 단계: Phase 3 · 배포(Vercel+Render)
+- 원인 영역: 네트워크
+- 관련 파일·커밋: `backend/main.py` (`FRONTEND_ORIGINS` 환경변수), Render Environment 설정
+- 작성 방식: 강의 모드(코치 초안). 6번은 내 말로 다시 쓸 것.
+
+**에러 메시지 원문**
+```
+$ curl -i -X OPTIONS https://mini-inflearn-api.onrender.com/enrollments \
+    -H "Origin: https://mini-inflearn.vercel.app" \
+    -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: content-type"
+HTTP/1.1 400 Bad Request
+(access-control-allow-origin 헤더 없음)
+```
+
+**1. 증상**
+https://mini-inflearn.vercel.app/courses 와 /courses/2 는 강의 정보가 정상으로 떴다. 그런데 Vercel 주소에서 보내는 수강신청 POST의 사전 요청(preflight)이 400이었고 허용 헤더가 없었다.
+
+**2. 내 가설**
+6-3 배포 전에 예고한 대로, Render의 `FRONTEND_ORIGINS`에 Vercel 주소가 아직 없어서 브라우저 요청만 막혔을 것이다.
+
+**3. 확인 방법**
+`Origin: http://localhost:3000`으로 보낸 요청은 `access-control-allow-origin`이 붙어서 돌아왔고, `Origin: https://mini-inflearn.vercel.app`은 400이었다. 같은 서버에서 Origin만 바꿔 결과가 갈리니 CORS 허용 목록 문제다.
+
+**4. 진짜 원인**
+SSR은 Vercel **서버**가 Render를 부르는 서버 간 요청이라 CORS 검사가 없다. 수강신청 버튼은 **브라우저**가 다른 출처(vercel.app → onrender.com)로 직접 보내는 요청이라, 백엔드가 허용한 출처 목록에 Vercel 주소가 있어야 한다. 그때 목록은 `http://localhost:3000`뿐이었다.
+
+**5. 해결**
+Render Environment에서 `FRONTEND_ORIGINS=http://localhost:3000,https://mini-inflearn.vercel.app`로 바꾸고 저장(자동 재배포). 이후 배포 사이트에서 신청하자 50,000P → 47,000P, "신청 완료"가 떴다.
+
+**6. 배운 원리**
+CORS는 브라우저가 지키는 규칙이라 서버끼리의 요청(SSR)에는 적용되지 않는다. 그래서 "목록은 되는데 버튼만 안 된다"면 CORS 허용 목록부터 의심한다. Origin 값은 끝의 `/`까지 글자가 정확히 같아야 한다.
+
+---
+
+### TS-012. Windows에서 uvicorn --reload가 재시작 도중 멈춰, 고친 코드 대신 옛 코드가 계속 응답
+- 날짜: 2026-11-08
+- 단계: Phase 2 · 수강신청 동시성 실험
+- 원인 영역: 환경
+- 관련 파일·커밋: `backend/main.py` (`with_for_update=True` 추가 후 `race_enroll.py 1 2` 재실험)
+- 작성 방식: 강의 모드(코치 초안). 6번은 내 말로 다시 쓸 것.
+
+**에러 메시지 원문**
+```
+WARNING:  StatReload detected changes in 'main.py'. Reloading...
+(그 뒤로 "Started server process"가 다시 찍히지 않음)
+
+== 실험 C: FOR UPDATE 잠금 + 동시 신청 (포인트 35,000)
+강의 1 신청 → 201 {'id': 8, 'course_id': 1, 'points_left': 2000}
+강의 2 신청 → 201 {'id': 7, 'course_id': 2, 'points_left': 32000}
+끝난 후: points 32000, 신청 [2, 1]
+```
+그 전에는 비슷한 이유로 이런 일도 있었다.
+```
+ERROR:    [WinError 10013] 액세스 권한에 의해 숨겨진 소켓에 액세스를 시도했습니다
+강의 2 → {"detail":"Not Found"}  [404]     ← 새 엔드포인트인데 404
+```
+
+**1. 증상**
+`FOR UPDATE`로 잠금을 걸었는데도 갱신 손실이 그대로 재현됐다. 앞서는 새로 만든 `/enrollments`, `/me`가 404를 돌려줬다.
+
+**2. 내 가설**
+코드가 틀린 게 아니라, 지금 응답하는 서버가 고친 코드를 읽지 않은 옛 서버일 것이다.
+
+**3. 확인 방법**
+서버 로그에서 SQL에 `FOR UPDATE`가 찍혔는지 찾았다(0건). `Reloading...` 뒤에 `Started server process`가 없었다. 프로세스 목록(`Win32_Process`에서 `uvicorn` 검색)에 예전에 띄운 서버가 살아서 8000번을 쥐고 있었다.
+
+**4. 진짜 원인**
+Windows에서 `--reload`가 옛 작업 프로세스를 정리하지 못하고 멈췄다. 옛 프로세스가 계속 요청을 받아 고치기 전 코드로 응답했다. 404 때는 테스트용으로 띄웠던 옛 서버가 포트를 차지해서 새 서버가 뜨지 못했다(WinError 10013).
+
+**5. 해결**
+`uv.exe` 기준으로 프로세스 트리를 통째로 종료(`taskkill /PID <uv PID> /F /T`)하고, `--reload` 없이 서버를 새로 띄웠다. 로그에 `FOR UPDATE`가 2번 찍혔고, 실험 결과가 201 + 400으로 바뀌었다.
+
+**6. 배운 원리**
+"고쳤는데 그대로다"면 코드를 의심하기 전에 **지금 응답하는 서버가 새 코드를 읽었는지**(시작 로그, SQL 로그, 프로세스 목록)부터 확인한다.
+
+---
+
+### TS-011. 서로 다른 강의를 동시에 신청하면 포인트가 한 번만 빠지는 갱신 손실(lost update) (사례 후보)
+- 날짜: 2026-11-08
+- 단계: Phase 2 · 수강신청 트랜잭션 (고장 실험)
+- 원인 영역: 백엔드
+- 관련 파일·커밋: `backend/main.py` `enroll`, `backend/race_enroll.py` (커밋 87d497f)
+- 작성 방식: 강의 모드(코치 초안). 6번은 내 말로 다시 쓸 것.
+
+**에러 메시지 원문**
+```
+== 실험 B: 잠금 없이 동시 신청 (포인트 35,000 / 강의1 33,000 + 강의2 3,000 = 36,000)
+시작 전: {'id': 1, 'name': '테스트유저', 'points': 35000, 'enrolled_course_ids': []}
+강의 1 신청 → 201 {'id': 5, 'course_id': 1, 'points_left': 2000}
+강의 2 신청 → 201 {'id': 6, 'course_id': 2, 'points_left': 32000}
+끝난 후: {'id': 1, 'name': '테스트유저', 'points': 32000, 'enrolled_course_ids': [1, 2]}
+```
+
+**1. 증상**
+35,000P로 36,000원어치 강의 2개가 둘 다 신청됐고, 포인트는 3,000P만 빠진 32,000P였다. 에러는 하나도 나지 않았다.
+
+**2. 내 가설**
+`race.py`(좌석 실험) 때처럼, 두 요청이 읽기와 쓰기 사이의 틈에서 같은 값을 읽었을 것이다.
+
+**3. 확인 방법**
+읽기 뒤에 `time.sleep(0.3)`을 넣어 틈을 넓히고 `race_enroll.py 1 2`로 동시에 보냈다. 두 응답의 `points_left`가 2,000과 32,000으로, 둘 다 35,000에서 출발해 계산한 값이었다.
+
+**4. 진짜 원인**
+두 트랜잭션이 동시에 `points = 35000`을 읽고 각자 `35000 - 가격`으로 덮어써서 먼저 쓴 값이 사라졌다(갱신 손실). 트랜잭션은 "차감 + 신청 기록"을 한 묶음으로 만들어 줄 뿐, 다른 트랜잭션이 같은 행을 동시에 읽는 것까지 막지는 않는다. 결과가 음수가 아니라서 `CHECK (points >= 0)`도, 서로 다른 강의라서 `UNIQUE (user_id, course_id)`도 잡지 못했다.
+
+**5. 해결**
+유저 행을 읽을 때 행 잠금을 건다.
+```python
+user = session.get(User, TEST_USER_ID, with_for_update=True)   # SELECT ... FOR UPDATE
+```
+같은 실험 결과: 강의 1 → 201(2,000P 남음), 강의 2 → 400 "포인트가 부족합니다". 두 번째 요청이 첫 번째 COMMIT을 기다렸다가 2,000P를 읽었다.
+
+**6. 배운 원리**
+(내 답변) UNIQUE는 같은 유저가 같은 강의를 샀을 때를 막는 것이고, 같은 유저가 다른 강의를 샀을 때는 막을 수 없게 짜여 있다.
+DB 제약은 "있을 수 없는 상태"를 막고, 잠금은 "동시에 읽고 쓰는 순서"를 막는다. 둘은 서로를 대신하지 못한다.
+
+---
 
 ### TS-010. 목록의 Link href에 백틱과 `${}`를 빼서 주소가 /courses/%7Bcourse.id%7D가 되고 FastAPI 422 → 404 페이지
 - 날짜: 2026-11-04
