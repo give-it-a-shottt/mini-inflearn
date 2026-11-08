@@ -13,7 +13,13 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 load_dotenv()                                   # ㄹ. .env 파일을 읽어 환경변수로 등록
 DATABASE_URL = os.getenv("DATABASE_URL")        # ㄷ. 환경변수에서 값 꺼내기
-engine = create_engine(DATABASE_URL, echo=True)  # ㄱ. 그 값으로 DB 연결
+if DATABASE_URL is None:
+    raise RuntimeError("DATABASE_URL 환경변수가 없습니다 (.env 또는 배포 설정 화면 확인)")
+# Neon 같은 클라우드는 postgresql:// 로 주는데, SQLAlchemy는 그러면 설치 안 된 psycopg2를 찾는다.
+# 우리가 설치한 psycopg(3) 드라이버를 쓰도록 앞부분을 바꿔 준다.
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
+engine = create_engine(DATABASE_URL, echo=True, pool_pre_ping=True)  # ㄱ. 그 값으로 DB 연결
 
 
 class Base(DeclarativeBase):
