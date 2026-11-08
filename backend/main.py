@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
-from sqlalchemy import ForeignKey, create_engine, select
+from sqlalchemy import ForeignKey, create_engine, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
@@ -173,6 +173,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/health")
+def health():
+    # 깨우기용. 프론트가 첫 화면에서 한 번 부른다(Render 무료 서버는 쉬면 잠든다).
+    # DB에도 SELECT 1을 보내 Neon(역시 쉬면 잠듦)까지 함께 깨운다.
+    with engine.connect() as conn:
+        conn.execute(text("SELECT 1"))
+    return {"ok": True}
 
 
 @app.get("/orm/courses", response_model=list[CourseOut])

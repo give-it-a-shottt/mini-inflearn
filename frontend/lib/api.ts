@@ -37,6 +37,13 @@ async function readError(res: Response, fallback: string) {
   return new ApiError(res.status, body.detail ?? `${fallback}: ${res.status}`);
 }
 
+// ── 서버 깨우기 ─────────────────────────────────────────────────────
+// Render 무료 서버와 Neon DB는 쉬면 잠든다. 결과는 쓰지 않고 "툭 건드리기"만 한다.
+// 실패해도(잠든 서버가 늦게 답해도) 화면에 영향을 주지 않게 오류를 삼킨다.
+export function wakeApi() {
+  fetch(`${API_BASE_URL}/health`).catch(() => {});
+}
+
 // ── 강의 (getServerSideProps에서 서버가 부른다) ───────────────────────
 export async function fetchCourses(): Promise<Course[]> {
   const res = await fetch(`${API_BASE_URL}/orm/courses`);
